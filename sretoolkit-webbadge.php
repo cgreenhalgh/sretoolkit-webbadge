@@ -35,4 +35,18 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+add_action( 'init', 'create_post_type' );
+function create_post_type() {
+	register_post_type( 'sretoolkit_badge',
+		array(
+			'labels' => array(
+				'name' => __( 'Badges' ),
+				'singular_name' => __( 'Badge' ),
+				'add_new_item' => __( 'Add New Badge Type' )
+			),
+		'public' => true,
+		'has_archive' => true,
+		)
+	);
+}
 
