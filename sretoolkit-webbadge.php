@@ -35,8 +35,14 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-add_action( 'init', 'create_post_type' );
-function create_post_type() {
+//===================================================================
+// custom post types: scheme and member
+
+// register to initialise
+add_action( 'init', 'sretk_create_post_type' );
+
+// on action 'init', create custom post types
+function sretk_create_post_type() {
 	// initial Scheme type.
 	// TODO refine to include e.g. Levels of accreditation, Accreditor
 	register_post_type( 'sretk_scheme',
@@ -189,5 +195,121 @@ function create_post_type() {
 				)
 		);
 	}
+}
+
+//===================================================================
+// custom meta data editor(s) for member post type
+// based on http://codex.wordpress.org/Function_Reference/add_meta_box example
+
+// http://stackoverflow.com/questions/3760222/how-to-include-css-and-jquery-in-my-wordpress-plugin
+function sretk_css_and_js() {
+	wp_register_style('sretk_css_and_js', plugins_url('style.css',__FILE__ ));
+	wp_enqueue_style('sretk_css_and_js');
+	//wp_register_script( 'sretk_css_and_js', plugins_url('your_script.js',__FILE__ ));
+	//wp_enqueue_script('sretk_css_and_js');
+}
+add_action( 'admin_init','sretk_css_and_js');
+
+/* Define the custom box */
+
+add_action( 'add_meta_boxes', 'sretk_add_custom_box' );
+
+// backwards compatible (before WP 3.0)
+// add_action( 'admin_init', 'sretk_add_custom_box', 1 );
+
+/* Do something with the data entered */
+add_action( 'save_post', 'sretk_save_postdata' );
+
+/* Adds a box to the main column on the Post and Page edit screens */
+function sretk_add_custom_box() {
+	$screens = array( 'sretk_scheme_member', 'post' );
+	foreach ($screens as $screen) {
+		add_meta_box(
+				'sretk_sectionid',
+				__( 'Member properties' ),
+				'sretk_inner_custom_box',
+				$screen
+		);
+	}
+}
+
+// does this go at the top level? not sure...
+require_wp_db();
+
+/* Prints the box content */
+function sretk_inner_custom_box( $post ) {
+	global $wpdb;
+	
+	// Use nonce for verification
+	wp_nonce_field( plugin_basename( __FILE__ ), 'sretk_noncename' );
+
+	// The actual fields for data entry
+	// Use get_post_meta to retrieve an existing value from the database and use the value for the form
+	$url_prefix_value = get_post_meta( $post->ID, '_sretk_url_prefix', true );
+	echo '<p><label for="sretk_url_prefix">';
+	_e( "Member website URL" );
+	echo '</label><br/> ';
+	echo '<input type="text" id="sretk_url_prefix" name="sretk_url_prefix" value="'.esc_attr($url_prefix_value).'" class="code" />';
+	echo '</p>';
+	
+	$scheme_id_value = get_post_meta( $post->ID, '_sretk_scheme_id', true );
+	echo '<p><label for="sretk_scheme_id">';
+	_e( "Scheme" );
+	echo '</label><br/> ';
+	// drop-down chooser
+	// TODO restrict to schemes created by the current user as post_author
+	$schemes = $wpdb->get_results( 
+		"
+		SELECT ID, post_title 
+		FROM $wpdb->posts
+		WHERE post_type = 'sretk_scheme' 
+		ORDER BY post_title ASC
+		", ARRAY_A
+	);
+	// 			AND post_author = 5
+	
+	echo '<select id="sretk_scheme_id" required name="sretk_scheme_id" >';
+	echo '<option value="">None</option>';
+	foreach ( $schemes as $scheme ) {
+		$selected = '';
+		if ($scheme['ID']==$scheme_id_value)
+			$selected = "selected ";
+		echo '<option value="'.esc_attr($scheme['ID']).'" '.$selected.'>'.esc_attr($scheme['post_title']).'</option>';
+	}
+	echo '</select>';
+	echo '</p>';
+	
+}
+
+/* When the post is saved, saves our custom data */
+function sretk_save_postdata( $post_id ) {
+
+	// First we need to check if the current user is authorised to do this action.
+	//if ( 'page' == $_POST['post_type'] ) {
+	//	if ( ! current_user_can( 'edit_page', $post_id ) )
+	//		return;
+	//} else {
+	if ( ! current_user_can( 'edit_post', $post_id ) )
+		return;
+	//}
+
+	// Secondly we need to check if the user intended to change this value.
+	if ( ! isset( $_POST['sretk_noncename'] ) || ! wp_verify_nonce( $_POST['sretk_noncename'], plugin_basename( __FILE__ ) ) )
+		return;
+
+	// Thirdly we can save the value to the database
+
+	//if saving in a custom table, get post_ID
+	$post_ID = $_POST['post_ID'];
+	//sanitize user input
+	$url_prefix_value = sanitize_text_field( $_POST['sretk_url_prefix'] );
+	$scheme_id_value = sanitize_text_field( $_POST['sretk_scheme_id'] );
+	
+	// Do something with $mydata
+	// either using
+	//add_post_meta($post_ID, '_my_meta_value_key', $mydata, true) or
+	update_post_meta($post_ID, '_sretk_url_prefix', $url_prefix_value);
+	update_post_meta($post_ID, '_sretk_scheme_id', $scheme_id_value);
+	// or a custom table (see Further Reading section below)
 }
 
