@@ -190,7 +190,7 @@ function sretk_create_post_type() {
 				'sretk_scheme_mstate', // the taxonomy
 				array(
 						'description'=> 'A current member',
-						'slug' => 'new',
+						'slug' => 'current',
 						//'parent'=> $parent_term_id
 				)
 		);
@@ -313,3 +313,23 @@ function sretk_save_postdata( $post_id ) {
 	// or a custom table (see Further Reading section below)
 }
 
+//===================================================================
+// Register custom template/view(s)
+
+// see http://wp.tutsplus.com/tutorials/plugins/a-guide-to-wordpress-custom-post-types-creation-display-and-meta-boxes/
+add_filter( 'template_include', 'sretk_include_template_function', 1 );
+
+function sretk_include_template_function( $template_path ) {
+	if ( get_post_type() == 'sretk_scheme' ) {
+		if ( is_single() ) {
+			// checks if the file exists in the theme first,
+			// otherwise serve the file from the plugin
+			if ( $theme_file = locate_template( array ( 'single-sretk_scheme.php' ) ) ) {
+				$template_path = $theme_file;
+			} else {
+				$template_path = plugin_dir_path( __FILE__ ) . '/single-sretk_scheme.php';
+			}
+		}
+	}
+	return $template_path;
+}
