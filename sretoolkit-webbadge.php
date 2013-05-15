@@ -277,6 +277,15 @@ function sretk_inner_custom_box( $post ) {
 		echo '<option value="'.esc_attr($scheme['ID']).'" '.$selected.'>'.esc_attr($scheme['post_title']).'</option>';
 	}
 	echo '</select>';
+	echo '<br/><label>Scheme web-badge HTML snippet</label>';
+	// TODO width, height, alt
+	$buttonhtml = '<a href="'.
+		site_url('/wp-content/plugins/sretoolkit-webbadge/scheme_link.php?scheme_id='.$scheme_id_value.'&member_id='.$post->ID).
+		'"><img src="'.
+		site_url('/wp-content/plugins/sretoolkit-webbadge/scheme_image.php?scheme_id='.$scheme_id_value.'&member_id='.$post->ID).
+		'"></img></a>';
+	// TODO styles
+	echo '<div><div>'.$buttonhtml.'</div><div><textarea cols=80 rows=4>'.esc_html($buttonhtml).'</textarea></div></div>';
 	echo '</p>';
 	
 }

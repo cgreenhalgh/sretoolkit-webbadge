@@ -76,9 +76,19 @@ load_template( $template_path, true ); ?>
  			        </article>
  			<?php
  		}
+ 		GLOBAL $member, $member_id, $referer_invalid, $referer;
  		
- 		if ($member) {
+ 		if (isset($member) && $member) {
  			output_member($member);
+ 			
+ 			if ($referer_invalid) {
+ 				if ($referer) {
+ 					echo '<p><strong>But you seem to have come from a different website</strong>; their site is <a href="'.$url_prefix_value.'">'.$url_prefix_value.'</a></p>'; 					
+ 				}
+ 				else {
+ 					echo '<p><strong>But we can\'t tell if have come from their website</strong>; their site is <a href="'.$url_prefix_value.'">'.$url_prefix_value.'</a></p>';
+ 				}
+ 			}
  		}
  		else if ($member_id) {
  			echo '<p><strong>This is not a current member</strong></p>';
