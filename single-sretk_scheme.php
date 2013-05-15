@@ -3,6 +3,8 @@
   * Template Name: single-sretk_scheme
   * 
   * based on http://wp.tutsplus.com/tutorials/plugins/a-guide-to-wordpress-custom-post-types-creation-display-and-meta-boxes/
+  * 
+  * Note: GLOBAL $member will be set if called for a valid scheme member
   */
  
 // NB our custom stripped-down header
@@ -54,27 +56,57 @@ load_template( $template_path, true ); ?>
 	 						)
 	 				)
  				);
+ 		
+ 		function output_member( $m ) {
+ 			GLOBAL $member;
+ 			?><article id="post-<?php $m->ID; ?>" <?php post_class('', $m->ID); ?>>
+ 			            <header class="entry-header">
+ 			 
+ 			                <!-- Display Title and Author Name -->
+ 			                <strong><?php if ($member && $member->ID==$m->ID) {
+ 			                	echo 'Current member';
+ 			                } else {
+ 			                	echo 'Member';
+ 			                } ?>: </strong><?php echo $m->post_title; ?><br />
+ 			
+ 			            </header>
+ 			 
+ 			            <!-- Display movie review contents -->
+ 			            <div class="entry-content"><?php echo $m->post_content; ?></div>
+ 			        </article>
+ 			<?php
+ 		}
+ 		
+ 		if ($member) {
+ 			output_member($member);
+ 		}
+ 		else if ($member_id) {
+ 			echo '<p><strong>This is not a current member</strong></p>';
+ 		}
+ 		
+ 		$first = true;
  		$members = new WP_Query( $args );
  		if ( $members->have_posts() ) {
  			while ( $members->have_posts() ) {
  				$members->the_post(); 
-?>
-        <article id="post-<?php the_ID(); ?>" <?php post_class(); ?>>
-            <header class="entry-header">
- 
-                <!-- Display Title and Author Name -->
-                <strong>Member: </strong><?php the_title(); ?><br />
-
-            </header>
- 
-            <!-- Display movie review contents -->
-            <div class="entry-content"><?php the_content(); ?></div>
-        </article>
-<?php 		}
+ 				$m = get_post();
+ 				if ($member && $m->ID==$member->ID)
+ 					continue;
+ 				if ($first) {
+ 					$first = false;
+ 					if ($member) {
+						echo '<br/><p>Other members:</p>';
+	 				} else {
+						echo '<br/><p>Members:</p>';
+ 					} 
+		
+ 				}
+				output_member($m);
+	 		}
  		}
  		wp_reset_postdata();
-?>
-    <?php endwhile; ?>
+
+		endwhile; ?>
     </div>
 </div>
 <?php wp_reset_query(); ?>
