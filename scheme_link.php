@@ -12,7 +12,7 @@ require_once( dirname(__FILE__) . '/../../../wp-load.php' );
 // parameters
 $scheme_id = isset($_GET['scheme_id']) ? $_GET['scheme_id'] : '';
 $member_id = isset($_GET['member_id']) ? $_GET['member_id'] : '';
-$referer = isset( $_SERVER['REFERER'] ) ? $_SERVER['REFERER'] : '';
+$referer = isset( $_SERVER['HTTP_REFERER'] ) ? $_SERVER['HTTP_REFERER'] : '';
 
 if (!$scheme_id) {
 	status_header( 400 );
@@ -85,7 +85,7 @@ if (have_posts()) {
 		$url_prefix_value = get_post_meta( $member->ID, '_sretk_url_prefix', true );
 		if ($url_prefix_value) {
 			if ($referer) {
-				if (!strncmp($referer, $url_prefix_value, strlen($url_prefix_value))) {
+				if (strncmp($referer, $url_prefix_value, strlen($url_prefix_value))) {
 					error_log( 'scheme_link.php called with invalid referer ('.$referer.' vs '.$url_prefix_value.')' );
 					$referer_invalid = true;					
 				}
