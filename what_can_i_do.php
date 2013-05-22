@@ -40,6 +40,12 @@ if (!is_user_logged_in()) {
 	return;
 }
 
+$types = '';
+//$types .= "resource(null,null,null,null,null,null).\n";
+$types .= "discontiguous(resource/6).\n";
+//$types .= "partof(null,null).\n";
+$types .= "discontiguous(partof/2).\n";
+
 $current_user = wp_get_current_user();
 $facts = '';
 $account_atom = "user".$current_user->ID;
@@ -48,7 +54,8 @@ $facts .= "% account id,service id,service type,login,url\n";
 $facts .= "account(".$account_atom.",".$service_atom.",service_srebadges,'".esc_attr($current_user->user_login)."','".site_url()."').\n";
 
 // schemes...
-$scheme_query = new WP_Query( array( 'post_type' => 'sretk_scheme', 'author' => $current_user->ID ) );
+$scheme_query = new WP_Query( array( 'post_type' => 'sretk_scheme', 'author' => $current_user->ID, 
+		'post_status' => array( 'publish', 'pending', 'draft' ) ) );
 while($scheme_query->have_posts() ) {
 	$scheme_query->next_post();
 	// $scheme_query->post...
@@ -66,7 +73,8 @@ while($scheme_query->have_posts() ) {
 							'key' => '_sretk_scheme_id',
 							'value' => $scheme_query->post->ID
 					)
-			)
+			),
+			'post_status' => array( 'publish', 'pending', 'draft' )
 	);
 	$member_query = new WP_Query( $member_args );
 	while ($member_query->have_posts() ) {
@@ -83,22 +91,24 @@ while($scheme_query->have_posts() ) {
 // rules - service-specific
 $rules = '';
 $rules .= <<<'EOT'
-possibleaction1(scheme_add,L,U,null) :- account(A,S,service_srebadges,L,U).
-possibleaction1(scheme_publish,L,U,R) :- account(A,S,service_srebadges,L,U), resource(R,resource_srescheme,RT,S,A,unpublished).
-possibleaction1(scheme_unpublish,L,U,R) :- account(A,S,service_srebadges,L,U), resource(R,resource_srescheme,RT,S,A,published).
-possibleaction1(scheme_member_add,L,U,R) :- account(A,S,service_srebadges,L,U), resource(R,resource_srescheme,RT,S,A,published).
-possibleaction1(scheme_member_makecurrent,L,U,R) :- account(A,S,service_srebadges,L,U), resource(R,resource_sreschememember,RT,S,A,unpublished_notcurrent).
-possibleaction1(scheme_member_makecurrent,L,U,R) :- account(A,S,service_srebadges,L,U), resource(R,resource_sreschememember,RT,S,A,published_notcurrent).
-possibleaction1(scheme_member_publish,L,U,R) :- account(A,S,service_srebadges,L,U), resource(R,resource_sreschememember,RT,S,A,unpublished_current).
+possibleaction1(scheme_add,L,U,null,'') :- account(A,S,service_srebadges,L,U).
+possibleaction1(scheme_publish,L,U,R,RT) :- account(A,S,service_srebadges,L,U), resource(R,resource_srescheme,RT,S,A,unpublished).
+possibleaction1(scheme_edit,L,U,R,RT) :- account(A,S,service_srebadges,L,U), resource(R,resource_srescheme,RT,S,A,_).
+possibleaction1(scheme_member_add,L,U,R,RT) :- account(A,S,service_srebadges,L,U), resource(R,resource_srescheme,RT,S,A,published).
+possibleaction1(scheme_member_edit,L,U,R,RT) :- account(A,S,service_srebadges,L,U), resource(R,resource_sreschememember,RT,S,A,_).
+possibleaction1(scheme_member_makecurrent,L,U,R,RT) :- account(A,S,service_srebadges,L,U), resource(R,resource_sreschememember,RT,S,A,published_notcurrent).
+possibleaction1(scheme_member_makecurrent,L,U,R,RT) :- account(A,S,service_srebadges,L,U), resource(R,resource_sreschememember,RT,S,A,unpublished_notcurrent).
+possibleaction1(scheme_member_publish,L,U,R,RT) :- account(A,S,service_srebadges,L,U), resource(R,resource_sreschememember,RT,S,A,unpublished_current).
 EOT;
 
 // goal(s)
-$goal = "possibleaction1(A,L,U,R)";
+$goal = "possibleaction1(A,L,U,R,RT)";
 
 // run gprolog...
 $tmpfname = tempnam(sys_get_temp_dir(), "sre");
 $tmpfname1 = $tmpfname.".pl";
 $handle = fopen($tmpfname1, "w");
+fwrite($handle, $types);
 fwrite($handle, $facts);
 fwrite($handle, $rules);
 fclose($handle);
@@ -107,7 +117,7 @@ $tmpfname2 = tempnam(sys_get_temp_dir(), "sre");
 $handle = fopen($tmpfname2, "w");
 fwrite($handle, "['".$tmpfname."'].\n");
 fwrite($handle, "leash(none).\n");
-fwrite($handle, "trace,findall(A,".$goal.",List).\n");
+fwrite($handle, "trace,findall(".$goal.",".$goal.",List).\n");
 fclose($handle);
 
 $output = array();
@@ -115,9 +125,79 @@ $rval = 0;
 $cmd = "gprolog 2>&1 < ".$tmpfname2;
 $ret = exec($cmd, $output, $rval);
 
+$traces = array();
+$list = null;
+
+function parse_list(&$toks) {
+	$list = array( type => 'list', items => array() );
+	while (count($toks)>0) {
+		$tok = $toks[0];
+		if ($tok==')')
+			break;
+		$term = parse_item($toks);
+		$list['items'][] = $term;
+		if ($term['type']=='error') {
+			break;
+		}
+		$tok = $toks[0];
+		if ($tok!=',')
+			break;
+		array_shift($toks);
+	}
+	return $list;
+}
+function parse_item(&$toks) {
+	$tok = array_shift($toks);
+	$term = null;
+	if ($tok && preg_match('/^[A-Za-z]/', $tok)) {
+		$term = array( type => 'atom', value => $tok );
+	} else if ($tok && substr($tok, 0, 1)=="'") {
+		$term = array( type => 'atom', value => substr($tok,1, -1) );		
+	}
+	else return array( type => 'error', value => $tok, message => 'expected an item' );
+	if (count($toks)==0)
+		return $term;
+	$tok = $toks[0];
+	if ($tok=='(') {
+		array_shift($toks);
+		$term['type'] = 'predicate';
+		$list = parse_list($toks);
+		if ($list['type']=='list')
+			$term['fields'] = $list['items'];
+		else
+			$term['fields'] = $list;
+		$tok = array_shift($toks);
+		if ($tok!=')')
+			return array( type => 'error', value => $tok, message => 'expected a )' );
+	} 
+	return $term;
+}
+function parse_prolog($s) {
+// 	$toks = array();
+	preg_match_all('/([A-Za-z][A-Za-z0-9_]*)|[0-9]+|([\']([^\'\\]|\\\\[\'])*[\'])|./', $s, $matches);
+	$toks = $matches[0];
+	$list = parse_list($toks);
+	if (count($toks)>0) {
+		$list['items'][] = array( type => 'error', value => $toks, message => 'trailing tokens' );
+	}
+	return $list;
+}
+
 $out = '';
 foreach ($output as $o) {
 	$out .= $o."\n";
+	$matches = array();
+	if (preg_match('/^List = [\\[](.*)[\\]]$/', $o, $matches))
+		$list = $matches[1];
+	else if (preg_match('/^[ \\t]*([0-9]+)[ \\t]+([0-9]+)[ \\t]+([A-Za-z]+):[ \\t]*(.*)$/', $o, $matches)) {
+		$t = array(
+				n1 => (int)($matches[1]),
+				n2 => (int)($matches[2]),
+				action => $matches[3],
+				info => $matches[4],
+				);		
+		$traces[] = $t;
+	}
 }
 
 /* 
@@ -172,6 +252,61 @@ get_header(); ?>
 				</header>
 
 				<div class="entry-content">
+				
+<?php
+$plist = parse_prolog($list);
+//print_r($plist);
+foreach ($plist['items'] as $actioninfo) {
+	echo '<div>';
+	if ($actioninfo['type']=='predicate' && $actioninfo['value']=='possibleaction1' && count($actioninfo['fields'])==5) {
+		$action = $actioninfo['fields'][0]['value'];
+		$login = $actioninfo['fields'][1]['value'];
+		$url = $actioninfo['fields'][2]['value'];
+		$resource = $actioninfo['fields'][3]['value'];
+		$resourcetitle = $actioninfo['fields'][4]['value'];
+		if ($action=='scheme_add') {
+			$path = "/wp-admin/post-new.php?post_type=sretk_scheme";
+			echo '<p><a href="'.esc_attr($url.$path).'">Add a new scheme</a></p>';
+		}
+		else if ($action=='scheme_publish' && substr($resource, 0, 6)=='scheme') {
+			$path = "/wp-admin/post.php?post=".substr($resource, 6)."&action=edit";
+			echo '<p><a href="'.esc_attr($url.$path).'">Publish draft scheme '.esc_html($resourcetitle).'</a></p>';
+		} 
+		else if ($action=='scheme_edit' && substr($resource, 0, 6)=='scheme') {
+			$path = "/wp-admin/post.php?post=".substr($resource, 6)."&action=edit";
+			echo '<p><a href="'.esc_attr($url.$path).'">Edit scheme '.esc_html($resourcetitle).'</a></p>';
+		} 
+		else if ($action=='scheme_member_add' && substr($resource, 0, 6)=='scheme') {
+			// TODO what about initialising the fields??  i.e. Scheme
+			$path = "/wp-admin/post-new.php?post_type=sretk_scheme_member";
+			echo '<p><a href="'.esc_attr($url.$path).'">Add a member to scheme '.esc_html($resourcetitle).'</a></p>';
+		} 
+		else if ($action=='scheme_member_edit' && substr($resource, 0, 6)=='member') {
+			$path = "/wp-admin/post.php?post=".substr($resource, 6)."&action=edit";
+			// TODO what about scheme title
+			echo '<p><a href="'.esc_attr($url.$path).'">Edit scheme member '.esc_html($resourcetitle).'</a></p>';
+		} 
+		else if ($action=='scheme_member_publish' && substr($resource, 0, 6)=='member') {
+			$path = "/wp-admin/post.php?post=".substr($resource, 6)."&action=edit";
+			// TODO what about scheme title
+			echo '<p><a href="'.esc_attr($url.$path).'">Publish draft scheme member '.esc_html($resourcetitle).'</a></p>';
+		} 
+		else if ($action=='scheme_member_makecurrent' && substr($resource, 0, 6)=='member') {
+			$path = "/wp-admin/post.php?post=".substr($resource, 6)."&action=edit";
+			// TODO what about scheme title
+			echo '<p><a href="'.esc_attr($url.$path).'">Make current scheme member '.esc_html($resourcetitle).'</a></p>';
+		} 
+		else
+			///wp-admin/post-new.php?post_type=sretk_scheme_member
+			echo '<p>'.$action.'</p>';
+	}
+	else {
+		echo '<p>'; print_r($actioninfo); echo '</p>';
+	}
+	echo '</div>';
+}
+?>					
+				
 					<div>
 						<p>Facts:</p>
 						<pre><?php echo esc_html($facts); ?></pre>
@@ -186,7 +321,15 @@ get_header(); ?>
 						<pre><?php echo esc_html($out); ?></pre>
 <?php /* $ret = passthru($cmd, $rval); */ ?>
 						</div>
-					...?
+						<p>List:</p>
+						<pre><?php echo $list; ?></pre>
+						<p>Trace:</p>
+						<pre><?php 
+						foreach ($traces as $t) {
+							echo $t['n1']." ".$t['n2']." ".$t['action']." ".$t['info']."\n"; 
+						}
+						?></pre>
+						...?
 				</div><!-- .entry-content -->
 			</article><!-- #post-0 -->
 
