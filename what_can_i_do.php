@@ -122,14 +122,14 @@ fclose($handle);
 
 $output = array();
 $rval = 0;
-$cmd = "gprolog 2>&1 < ".$tmpfname2;
+$cmd = 'PATH=/lhome/cmg/gprolog-1.4.4/bin:$PATH;'."gprolog 2>&1 < ".$tmpfname2;
 $ret = exec($cmd, $output, $rval);
 
 $traces = array();
 $list = null;
 
 function parse_list(&$toks) {
-	$list = array( type => 'list', items => array() );
+	$list = array( 'type' => 'list', 'items' => array() );
 	while (count($toks)>0) {
 		$tok = $toks[0];
 		if ($tok==')')
@@ -139,7 +139,7 @@ function parse_list(&$toks) {
 		if ($term['type']=='error') {
 			break;
 		}
-		$tok = $toks[0];
+		$tok = count($toks)>0 ? $toks[0] : null;
 		if ($tok!=',')
 			break;
 		array_shift($toks);
@@ -150,11 +150,11 @@ function parse_item(&$toks) {
 	$tok = array_shift($toks);
 	$term = null;
 	if ($tok && preg_match('/^[A-Za-z]/', $tok)) {
-		$term = array( type => 'atom', value => $tok );
+		$term = array( 'type' => 'atom', 'value' => $tok );
 	} else if ($tok && substr($tok, 0, 1)=="'") {
-		$term = array( type => 'atom', value => substr($tok,1, -1) );		
+		$term = array( 'type' => 'atom', 'value' => substr($tok,1, -1) );		
 	}
-	else return array( type => 'error', value => $tok, message => 'expected an item' );
+	else return array( 'type' => 'error', 'value' => $tok, 'message' => 'expected an item' );
 	if (count($toks)==0)
 		return $term;
 	$tok = $toks[0];
@@ -168,7 +168,7 @@ function parse_item(&$toks) {
 			$term['fields'] = $list;
 		$tok = array_shift($toks);
 		if ($tok!=')')
-			return array( type => 'error', value => $tok, message => 'expected a )' );
+			return array( 'type' => 'error', 'value' => $tok, 'message' => 'expected a )' );
 	} 
 	return $term;
 }
@@ -178,7 +178,7 @@ function parse_prolog($s) {
 	$toks = $matches[0];
 	$list = parse_list($toks);
 	if (count($toks)>0) {
-		$list['items'][] = array( type => 'error', value => $toks, message => 'trailing tokens' );
+		$list['items'][] = array( 'type' => 'error', 'value' => $toks, 'message' => 'trailing tokens' );
 	}
 	return $list;
 }
@@ -191,10 +191,10 @@ foreach ($output as $o) {
 		$list = $matches[1];
 	else if (preg_match('/^[ \\t]*([0-9]+)[ \\t]+([0-9]+)[ \\t]+([A-Za-z]+):[ \\t]*(.*)$/', $o, $matches)) {
 		$t = array(
-				n1 => (int)($matches[1]),
-				n2 => (int)($matches[2]),
-				action => $matches[3],
-				info => $matches[4],
+				'n1' => (int)($matches[1]),
+				'n2' => (int)($matches[2]),
+				'action' => $matches[3],
+				'info' => $matches[4],
 				);		
 		$traces[] = $t;
 	}
