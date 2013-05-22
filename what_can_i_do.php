@@ -91,18 +91,18 @@ while($scheme_query->have_posts() ) {
 // rules - service-specific
 $rules = '';
 $rules .= <<<'EOT'
-possibleaction1(scheme_add,L,U,null,'') :- account(A,S,service_srebadges,L,U).
-possibleaction1(scheme_publish,L,U,R,RT) :- account(A,S,service_srebadges,L,U), resource(R,resource_srescheme,RT,S,A,unpublished).
-possibleaction1(scheme_edit,L,U,R,RT) :- account(A,S,service_srebadges,L,U), resource(R,resource_srescheme,RT,S,A,_).
-possibleaction1(scheme_member_add,L,U,R,RT) :- account(A,S,service_srebadges,L,U), resource(R,resource_srescheme,RT,S,A,published).
-possibleaction1(scheme_member_edit,L,U,R,RT) :- account(A,S,service_srebadges,L,U), resource(R,resource_sreschememember,RT,S,A,_).
-possibleaction1(scheme_member_makecurrent,L,U,R,RT) :- account(A,S,service_srebadges,L,U), resource(R,resource_sreschememember,RT,S,A,published_notcurrent).
-possibleaction1(scheme_member_makecurrent,L,U,R,RT) :- account(A,S,service_srebadges,L,U), resource(R,resource_sreschememember,RT,S,A,unpublished_notcurrent).
-possibleaction1(scheme_member_publish,L,U,R,RT) :- account(A,S,service_srebadges,L,U), resource(R,resource_sreschememember,RT,S,A,unpublished_current).
+possibleaction1(scheme_add,L,U,null,'',null,'') :- account(A,S,service_srebadges,L,U).
+possibleaction1(scheme_publish,L,U,R,RT,null,'') :- account(A,S,service_srebadges,L,U), resource(R,resource_srescheme,RT,S,A,unpublished).
+possibleaction1(scheme_edit,L,U,R,RT,null,'') :- account(A,S,service_srebadges,L,U), resource(R,resource_srescheme,RT,S,A,_).
+possibleaction1(scheme_member_add,L,U,R,RT,null,'') :- account(A,S,service_srebadges,L,U), resource(R,resource_srescheme,RT,S,A,published).
+possibleaction1(scheme_member_edit,L,U,R,RT,R2,RT2) :- account(A,S,service_srebadges,L,U), resource(R,resource_sreschememember,RT,S,A,_), partof(R,R2), resource(R2,resource_srescheme,RT2,S,A,_).
+possibleaction1(scheme_member_makecurrent,L,U,R,RT,R2,RT2) :- account(A,S,service_srebadges,L,U), resource(R,resource_sreschememember,RT,S,A,published_notcurrent), partof(R,R2), resource(R2,resource_srescheme,RT2,S,A,_).
+possibleaction1(scheme_member_makecurrent,L,U,R,RT,R2,RT2) :- account(A,S,service_srebadges,L,U), resource(R,resource_sreschememember,RT,S,A,unpublished_notcurrent), partof(R,R2), resource(R2,resource_srescheme,RT2,S,A,_).
+possibleaction1(scheme_member_publish,L,U,R,RT,R2,RT2) :- account(A,S,service_srebadges,L,U), resource(R,resource_sreschememember,RT,S,A,unpublished_current), partof(R,R2), resource(R2,resource_srescheme,RT2,S,A,_).
 EOT;
 
 // goal(s)
-$goal = "possibleaction1(A,L,U,R,RT)";
+$goal = "possibleaction1(A,L,U,R,RT,R2,RT2)";
 
 // run gprolog...
 $tmpfname = tempnam(sys_get_temp_dir(), "sre");
@@ -258,12 +258,14 @@ $plist = parse_prolog($list);
 //print_r($plist);
 foreach ($plist['items'] as $actioninfo) {
 	echo '<div>';
-	if ($actioninfo['type']=='predicate' && $actioninfo['value']=='possibleaction1' && count($actioninfo['fields'])==5) {
+	if ($actioninfo['type']=='predicate' && $actioninfo['value']=='possibleaction1' && count($actioninfo['fields'])==7) {
 		$action = $actioninfo['fields'][0]['value'];
 		$login = $actioninfo['fields'][1]['value'];
 		$url = $actioninfo['fields'][2]['value'];
 		$resource = $actioninfo['fields'][3]['value'];
 		$resourcetitle = $actioninfo['fields'][4]['value'];
+		$resource2 = $actioninfo['fields'][5]['value'];
+		$resourcetitle2 = $actioninfo['fields'][6]['value'];
 		if ($action=='scheme_add') {
 			$path = "/wp-admin/post-new.php?post_type=sretk_scheme";
 			echo '<p><a href="'.esc_attr($url.$path).'">Add a new scheme</a></p>';
@@ -274,27 +276,27 @@ foreach ($plist['items'] as $actioninfo) {
 		} 
 		else if ($action=='scheme_edit' && substr($resource, 0, 6)=='scheme') {
 			$path = "/wp-admin/post.php?post=".substr($resource, 6)."&action=edit";
-			echo '<p><a href="'.esc_attr($url.$path).'">Edit scheme '.esc_html($resourcetitle).'</a></p>';
+			echo '<p><a href="'.esc_attr($url.$path).'">Edit scheme "'.esc_html($resourcetitle).'"</a></p>';
 		} 
 		else if ($action=='scheme_member_add' && substr($resource, 0, 6)=='scheme') {
 			// TODO what about initialising the fields??  i.e. Scheme
 			$path = "/wp-admin/post-new.php?post_type=sretk_scheme_member";
-			echo '<p><a href="'.esc_attr($url.$path).'">Add a member to scheme '.esc_html($resourcetitle).'</a></p>';
+			echo '<p><a href="'.esc_attr($url.$path).'">Add a member to scheme "'.esc_html($resourcetitle).'"</a></p>';
 		} 
 		else if ($action=='scheme_member_edit' && substr($resource, 0, 6)=='member') {
 			$path = "/wp-admin/post.php?post=".substr($resource, 6)."&action=edit";
 			// TODO what about scheme title
-			echo '<p><a href="'.esc_attr($url.$path).'">Edit scheme member '.esc_html($resourcetitle).'</a></p>';
+			echo '<p><a href="'.esc_attr($url.$path).'">Edit scheme "'.esc_html($resourcetitle2).'" member "'.esc_html($resourcetitle).'"</a></p>';
 		} 
 		else if ($action=='scheme_member_publish' && substr($resource, 0, 6)=='member') {
 			$path = "/wp-admin/post.php?post=".substr($resource, 6)."&action=edit";
 			// TODO what about scheme title
-			echo '<p><a href="'.esc_attr($url.$path).'">Publish draft scheme member '.esc_html($resourcetitle).'</a></p>';
+			echo '<p><a href="'.esc_attr($url.$path).'">Publish scheme "'.esc_html($resourcetitle2).'" draft member "'.esc_html($resourcetitle).'"</a></p>';
 		} 
 		else if ($action=='scheme_member_makecurrent' && substr($resource, 0, 6)=='member') {
 			$path = "/wp-admin/post.php?post=".substr($resource, 6)."&action=edit";
 			// TODO what about scheme title
-			echo '<p><a href="'.esc_attr($url.$path).'">Make current scheme member '.esc_html($resourcetitle).'</a></p>';
+			echo '<p><a href="'.esc_attr($url.$path).'">Make scheme "'.esc_html($resourcetitle2).'" member "'.esc_html($resourcetitle).'" current</a></p>';
 		} 
 		else
 			///wp-admin/post-new.php?post_type=sretk_scheme_member
