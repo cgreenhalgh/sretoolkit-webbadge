@@ -42,9 +42,9 @@ if (!is_user_logged_in()) {
 
 $types = '';
 //$types .= "resource(null,null,null,null,null,null).\n";
-$types .= "discontiguous(resource/6).\n";
+$types .= ":- discontiguous(resource/6).\n";
 //$types .= "partof(null,null).\n";
-$types .= "discontiguous(partof/2).\n";
+$types .= ":- discontiguous(partof/2).\n";
 
 $current_user = wp_get_current_user();
 $facts = '';
